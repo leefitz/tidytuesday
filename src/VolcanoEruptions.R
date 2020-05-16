@@ -2,6 +2,8 @@ library(tidyverse)
 library(magrittr)
 library(lubridate)
 library(gtools)
+library(leaflet)
+library(RColorBrewer)
 
 eruptionsraw <- read_csv("data/2020/2020-05-12/eruptions.csv")
 eventsraw <- read_csv("data/2020/2020-05-12/events.csv")
@@ -87,7 +89,10 @@ volcano <-
   ) %>% 
   filter(rockname != chr(160)) %>% 
   mutate(
-    rocktype = rocktype %>% str_sub(1, -3) %>% str_replace("_", " ") %>% str_to_title(),
+    rocktype = rocktype %>% 
+      str_sub(1, -3) %>% 
+      str_replace("_", " ") %>% 
+      str_to_title(),
     seen = TRUE
     ) %>% 
   unite(rock, rocktype:rockname, sep = " - ") %>% 
@@ -96,3 +101,47 @@ volcano <-
     values_from = seen,
     values_fill = list(seen = FALSE)
   )
+
+leafletdata <- 
+  eruptions %>% 
+  filter(start_year > 1900) %>% 
+  group_by(volcano_number) %>% 
+  summarise(eruptioncount = n()) %>% 
+  right_join(volcano, by = "volcano_number") %>% 
+  mutate(
+    eruptioncount = eruptioncount %>% na.replace(0),
+    eruptionclassification = case_when(
+      eruptioncount == 0 ~ "No Eruption Recorded",
+      TRUE ~ "Eruption Recorded"
+    ) %>% as_factor()
+  )
+
+leafletpal <- 
+  colorFactor(
+    brewer.pal(n = 8, name = 'Set2') %>% extract(1:2), 
+    leafletdata %>% use_series(eruptionclassification)
+  )
+
+leafletdata %>% 
+  leaflet() %>% 
+  # addTiles() %>% 
+  addProviderTiles(providers$Stamen.TonerLite) %>% 
+  addCircles(
+    ~longitude, ~latitude,
+    # clusterOptions = markerClusterOptions()
+    popup = ~volcano_name,
+    label = ~eruptionclassification,
+    radius = 50000,
+    # stroke = FALSE,
+    # weight = 2,
+    fillOpacity = .5,
+    color = ~leafletpal(eruptionclassification)
+  ) %>% 
+  addLegend(
+    "bottomright", pal = leafletpal, values = ~eruptionclassification,
+    title = "Eruptions Since 1900"
+  )
+
+leafletdata %>% 
+  ggplot(aes(eruptioncount)) +
+  geom_bar()
