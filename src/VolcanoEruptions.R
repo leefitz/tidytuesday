@@ -87,7 +87,7 @@ volcano <-
     names_pattern = "(.*_\\d)",
     values_to = "rockname"
   ) %>% 
-  filter(rockname != chr(160)) %>% 
+  filter(rockname  %>% str_length %>% is_greater_than(1)) %>% 
   mutate(
     rocktype = rocktype %>% 
       str_sub(1, -3) %>% 
@@ -98,8 +98,9 @@ volcano <-
   unite(rock, rocktype:rockname, sep = " - ") %>% 
   pivot_wider(
     names_from = rock,
-    values_from = seen,
-    values_fill = list(seen = FALSE)
+    values_from = seen
+    # values_fill = list(seen = FALSE),
+    # values_fn = list(seen = list)
   )
 
 leafletdata <- 
